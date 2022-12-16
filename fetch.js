@@ -1,6 +1,6 @@
 const https = require("https");
 
-module.exports = function fetch(options, data) {
+module.exports = function fetch(options) {
   return new Promise(function (resolve, reject) {
     const req = https.request(options, function (res) {
       let data = "";
@@ -28,9 +28,6 @@ module.exports = function fetch(options, data) {
       reject(err);
     });
 
-    if (data) {
-      req.write(data);
-    }
     req.end();
   });
 };

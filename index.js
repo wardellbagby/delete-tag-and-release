@@ -1,9 +1,9 @@
 const fetch = require("./fetch");
+const {createGetReleasesPath, createDeleteReleasesPath, createDeleteTagPath, createTagRef} = require("./utils");
 
 if (!process.env.GITHUB_TOKEN) {
   console.error("🔴 no GITHUB_TOKEN found. pass `GITHUB_TOKEN` as env");
-  process.exitCode = 1;
-  return;
+  process.exit(1);
 }
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
@@ -15,15 +15,13 @@ if (process.env.INPUT_REPO) {
   [owner, repo] = process.env.GITHUB_REPOSITORY.split("/");
 } else {
   console.error("🔴 no GITHUB_REPOSITORY found. pass `GITHUB_REPOSITORY` as env or owner/repo as inputs");
-  process.exitCode = 1;
-  return;
+  process.exit(1);
 }
 console.log(`📕  given repo is "${owner}/${repo}"`);
 
 if (!process.env.INPUT_TAG_NAME) {
   console.error("🌶  no tag name found. use `tag_name` to pass value");
-  process.exitCode = 1;
-  return;
+  process.exit(1);
 }
 const tagName = process.env.INPUT_TAG_NAME;
 
@@ -42,13 +40,13 @@ const commonOpts = {
 
 console.log(`🏷  given tag is "${tagName}"`);
 
-const tagRef = `refs/tags/${tagName}`;
+const tagRef = createTagRef(tagName);
 
 async function deleteTag() {
   try {
-    const _ = await fetch({
+    await fetch({
       ...commonOpts,
-      path: `/repos/${owner}/${repo}/git/${tagRef}`,
+      path: createDeleteTagPath(tagRef, `${owner}/${repo}`),
       method: "DELETE",
     });
 
@@ -58,10 +56,9 @@ async function deleteTag() {
     if (error.message === "Reference does not exist") {
       console.error("😕  Proceeding anyway, because tag not existing is the goal");
     } else {
-      console.error(`🌶  An error occured while deleting the tag "${tagName}"`);
-      process.exitCode = 1;
+      console.error(`🌶  An error occurred while deleting the tag "${tagName}"`);
+      process.exit(1)
     }
-    return;
   }
 }
 
@@ -70,15 +67,15 @@ async function deleteReleases() {
   try {
     const data = await fetch({
       ...commonOpts,
-      path: `/repos/${owner}/${repo}/releases`,
+      path: createGetReleasesPath(`${owner}/${repo}`),
       method: "GET",
     });
     releaseIds = (data || [])
-      .filter(({ tag_name, draft }) => tag_name === tagName && draft === false)
-      .map(({ id }) => id);
+      .filter(({tag_name, draft}) => tag_name === tagName && draft === false)
+      .map(({id}) => id);
   } catch (error) {
     console.error(`🌶  failed to get list of releases <- ${error.message}`);
-    process.exitCode = 1;
+    process.exit(1)
     return;
   }
 
@@ -88,36 +85,27 @@ async function deleteReleases() {
   }
   console.log(`🍻  found ${releaseIds.length} releases to delete`);
 
-  let hasError = false;
   for (let i = 0; i < releaseIds.length; i++) {
     const releaseId = releaseIds[i];
 
     try {
-      const _ = await fetch({
+      await fetch({
         ...commonOpts,
-        path: `/repos/${owner}/${repo}/releases/${releaseId}`,
+        path: createDeleteReleasesPath(releaseId, `${owner}/${repo}`),
         method: "DELETE",
       });
     } catch (error) {
       console.error(`🌶  failed to delete release with id "${releaseId}"  <- ${error.message}`);
-      hasError = true;
-      break;
+      process.exit(1);
     }
-  }
-
-  if (hasError) {
-    process.exitCode = 1;
-    return;
   }
 
   console.log(`👍🏼  all releases deleted successfully!`);
 }
 
-async function run() {
+module.exports = async function run() {
   if (shouldDeleteRelease) {
     await deleteReleases();
   }
   await deleteTag();
 }
-
-run();
