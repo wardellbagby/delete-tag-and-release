@@ -1,23 +1,95 @@
-name: 'Run tests'
+name: "Run tests"
 on:
   pull_request:
     branches:
-      - 'master'
+      - "master"
 jobs:
-  test:
-    name: 'Tests (Node ${{ matrix.node_version }})'
+  unit_test:
+    name: "Unit tests (Node ${{ matrix.node_version }})"
     strategy:
       matrix:
         node_version: [16, 18]
-    runs-on: 'ubuntu-22.04'
+    runs-on: "ubuntu-22.04"
     steps:
-      - name: 'Checkout the current branch'
-        uses: 'actions/checkout@v3'
-      - name: 'Setup Node'
-        uses: 'actions/setup-node@v3'
+      - name: "Checkout the current branch"
+        uses: "actions/checkout@v3"
+      - name: "Setup Node"
+        uses: "actions/setup-node@v3"
         with:
           node-version: ${{ matrix.node_version }}
-      - name: 'Install Node modules'
-        run: 'npm ci'
-      - name: 'Run tests'
-        run: 'npm run test'
+      - name: "Install Node modules"
+        run: "npm ci"
+      - name: "Run tests"
+        run: "npm run test"
+  instrumention_tests:
+    name: "Instrumentation tests"
+    runs-on: "ubuntu-22.04"
+    steps:
+      - name: "Checkout the current branch"
+        uses: "actions/checkout@v3"
+      - name: "Setup Node"
+        uses: "actions/setup-node@v3"
+        with:
+          node-version: 18
+      - name: "Install Node modules"
+        run: "npm ci"
+
+      - name: "Create a release against tag v1.0.0, tag v2.0.0, and a draft release against tag v2.0.1 on the test repo"
+        run: ".github/workflows/release-and-tag-creator.js create rel:release1,tag:v1.0.0 tag:v2.0.0 rel:release3,tag:v2.0.1,dft:true"
+        env:
+          OWNER: "${{ secrets.TEST_REPO_OWNER }}"
+          REPO: "${{ secrets.TEST_REPO_NAME }}"
+          TOKEN: "${{ secrets.TEST_REPO_TOKEN }}"
+      - name: "Use action to delete the v1.0.0 tag but not any releases"
+        uses: "./"
+        with:
+          tag_name: v1.0.0
+          github_token: ${{ secrets.TEST_REPO_TOKEN }}
+          delete_release: false
+          repo: "${{ secrets.TEST_REPO_OWNER }}/${{ secrets.TEST_REPO_NAME }}"
+      - name: "See a draft release1 against the v1.0.0 tag, the v2.00 tag, and one draft release against tag v2.0.1 on the test repo"
+        run: ".github/workflows/release-and-tag-creator.js check rel:release1,tag:v1.0.0,dft:true tag:v2.0.0 rel:release3,tag:v2.0.1,dft:true"
+        env:
+          OWNER: "${{ secrets.TEST_REPO_OWNER }}"
+          REPO: "${{ secrets.TEST_REPO_NAME }}"
+          TOKEN: "${{ secrets.TEST_REPO_TOKEN }}"
+
+      - name: "Create a release against tag v1.0.0, tag v2.0.0, and a draft release against tag v2.0.1 on the test repo"
+        run: ".github/workflows/release-and-tag-creator.js create rel:release1,tag:v1.0.0 tag:v2.0.0 rel:release3,tag:v2.0.1,dft:true"
+        env:
+          OWNER: "${{ secrets.TEST_REPO_OWNER }}"
+          REPO: "${{ secrets.TEST_REPO_NAME }}"
+          TOKEN: "${{ secrets.TEST_REPO_TOKEN }}"
+      - name: "Use action to delete the second release and tag"
+        uses: "./"
+        with:
+          tag_name: v1.0.0
+          github_token: ${{ secrets.TEST_REPO_TOKEN }}
+          delete_release: false
+          repo: "${{ secrets.TEST_REPO_OWNER }}/${{ secrets.TEST_REPO_NAME }}"
+      - name: "See the first release, and one draft release on the test repo"
+        run: ".github/workflows/release-and-tag-creator.js check rel:release1,tag:v1.0.0 tag:v2.0.0 rel:release3,tag:v2.0.1,dft:true"
+        env:
+          OWNER: "${{ secrets.TEST_REPO_OWNER }}"
+          REPO: "${{ secrets.TEST_REPO_NAME }}"
+          TOKEN: "${{ secrets.TEST_REPO_TOKEN }}"
+
+      - name: "Create a release against tag v1.0.0, tag v2.0.0, and a draft release against tag v2.0.1 on the test repo"
+        run: ".github/workflows/release-and-tag-creator.js create rel:release1,tag:v1.0.0 tag:v2.0.0 rel:release3,tag:v2.0.1,dft:true"
+        env:
+          OWNER: "${{ secrets.TEST_REPO_OWNER }}"
+          REPO: "${{ secrets.TEST_REPO_NAME }}"
+          TOKEN: "${{ secrets.TEST_REPO_TOKEN }}"
+      - name: "Use action to delete the v2.0.1 tag"
+        uses: "./"
+        with:
+          tag_name: v1.0.0
+          github_token: ${{ secrets.TEST_REPO_TOKEN }}
+          delete_release: true
+          repo: "${{ secrets.TEST_REPO_OWNER }}/${{ secrets.TEST_REPO_NAME }}"
+      - name: "See the first release against v1.0.0, tag v2.0.0, and the draft release against v2.0.1 on the test repo"
+        run: ".github/workflows/release-and-tag-creator.js check rel:release1,tag:v1.0.0 tag:v2.0.0 rel:release3,tag:v2.0.1,dft:true"
+        env:
+          OWNER: "${{ secrets.TEST_REPO_OWNER }}"
+          REPO: "${{ secrets.TEST_REPO_NAME }}"
+          TOKEN: "${{ secrets.TEST_REPO_TOKEN }}"
